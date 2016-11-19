@@ -1,4 +1,5 @@
 extern crate libc;
+extern crate time;
 
 use heap;
 use heap::immix::ImmixMutatorLocal;
@@ -38,14 +39,9 @@ pub fn exhaust_alloc() {
     alloc_loop(&mut mutator);
 }
 
-#[cfg(target_os = "linux")]
 #[inline(never)]
 fn alloc_loop(mutator: &mut ImmixMutatorLocal) {
-    use common::perf;
-    
-    let perf = unsafe {perf::start_perf_events()};
-    unsafe {perf::perf_read_values(perf);}
-    let t_start = unsafe {perf::cur_time()};
+    let t_start = time::now_utc();
     
     for _ in 0..ALLOCATION_TIMES {
 //        mutator.yieldpoint();
@@ -54,20 +50,7 @@ fn alloc_loop(mutator: &mut ImmixMutatorLocal) {
         mutator.init_object(res, 0b1100_0011);  
     }
     
-    let t_end = unsafe {perf::cur_time()};
-    unsafe {perf::perf_read_values(perf);}
+    let t_end = time::now_utc();
     
-    println!("time used: {} msec", unsafe {perf::diff_in_ms(t_start, t_end)});
-    unsafe {perf::perf_print(perf);}
-}
-
-#[cfg(not(target_os = "linux"))]
-#[allow(unused_variables)]
-fn alloc_loop(mutator: &mut ImmixMutatorLocal) {
-    for _ in 0..ALLOCATION_TIMES {
-        mutator.yieldpoint();
-        
-        let res = mutator.alloc(OBJECT_SIZE, OBJECT_ALIGN);
-        mutator.init_object(res, 0b1100_0011);  
-    }
+    println!("time used: {} msec", (t_end - t_start).num_milliseconds());;
 }

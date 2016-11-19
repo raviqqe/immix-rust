@@ -84,7 +84,8 @@ Run `cargo build --release` under the repo directory to build the GC
 (add `--features mt-trace` to turn on parallel GC), which
 will generate a dynamic linked library under `target/release/`.
 `rust_c_interface/test.c` gives an example on how to use the GC from
-C code. Compile and link `test.c` with the library to test.
+C code. Compile and link `test.c` with the library to test (it is an
+infinite allocation loop).
 
 Near Future Plan
 ------

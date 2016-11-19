@@ -47,16 +47,12 @@ pub fn alloc_mark() {
     mark_loop(objs, &shared_space);
 }
 
-#[cfg(target_os = "linux")]
 #[inline(never)]
 fn mark_loop(objs: Vec<ObjectReference>, shared_space: &Arc<ImmixSpace>) {
-    use common::perf;
     use objectmodel;
     
     println!("Start marking");
-    let perf = unsafe {perf::start_perf_events()};
-    unsafe {perf::perf_read_values(perf);}    
-    let t_start = unsafe {perf::cur_time()};
+    let t_start = time::now_utc();
     
     let mark_state = objectmodel::MARK_STATE.load(Ordering::SeqCst) as u8;
     
@@ -77,15 +73,7 @@ fn mark_loop(objs: Vec<ObjectReference>, shared_space: &Arc<ImmixSpace>) {
         } 
     }
     
-    let t_end = unsafe {perf::cur_time()};
-    unsafe {perf::perf_read_values(perf);}    
+    let t_end = time::now_utc();
     
-    println!("time used: {} msec", unsafe {perf::diff_in_ms(t_start, t_end)});
-    unsafe {perf::perf_print(perf);}    
-}
-
-#[cfg(not(target_os = "linux"))]
-#[allow(unused_variables)]
-fn mark_loop(objs: Vec<ObjectReference>, shared_space: &Arc<ImmixSpace>) {
-    unimplemented!()
+    println!("time used: {} msec", (t_end - t_start).num_milliseconds());
 }

@@ -1,3 +1,5 @@
+extern crate time;
+
 use heap;
 use heap::immix::ImmixMutatorLocal;
 use heap::immix::ImmixSpace;
@@ -44,30 +46,17 @@ pub fn alloc_init() {
     init_loop(objs, &mut mutator);
 }
 
-#[cfg(target_os = "linux")]
 #[inline(never)]
 fn init_loop(objs: Vec<Address>, mutator: &mut ImmixMutatorLocal) {
-    use common::perf;
-    
     println!("Start init objects");
-    let perf = unsafe {perf::start_perf_events()};
-    unsafe {perf::perf_read_values(perf);}    
-    let t_start = unsafe {perf::cur_time()};
+    let t_start = time::now_utc();
     
     for obj in objs {    
         mutator.init_object_no_inline(obj, 0b1100_0011);
 //        mutator.init_object_no_inline(obj, 0b1100_0111);
     }
     
-    let t_end = unsafe {perf::cur_time()};
-    unsafe {perf::perf_read_values(perf);}    
+    let t_end = time::now_utc();
     
-    println!("time used: {} msec", unsafe {perf::diff_in_ms(t_start, t_end)});
-    unsafe {perf::perf_print(perf);}    
-}
-
-#[cfg(not(target_os = "linux"))]
-#[allow(unused_variables)]
-fn init_loop(objs: Vec<Address>, mutator: &mut ImmixMutatorLocal) {
-    unimplemented!()
+    println!("time used: {} msec", (t_end - t_start).num_milliseconds());
 }

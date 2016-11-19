@@ -61,29 +61,16 @@ pub fn alloc_trace() {
     trace_loop(root, shared_space, lo_space);
 }
 
-#[cfg(target_os = "linux")]
 #[inline(never)]
 fn trace_loop(root: Address, shared_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
-    use common::perf;    
-    
     println!("Start tracing");
     let mut roots = vec![unsafe {root.to_object_reference()}];
-    
-    let perf = unsafe {perf::start_perf_events()};
-    unsafe {perf::perf_read_values(perf);}
+
     let t_start = time::now_utc();
     
     heap::gc::start_trace(&mut roots, shared_space, lo_space);
     
     let t_end = time::now_utc();
-    unsafe {perf::perf_read_values(perf);}
     
     println!("time used: {} msec", (t_end - t_start).num_milliseconds());
-    unsafe {perf::perf_print(perf);}
-}
-
-#[cfg(not(target_os = "linux"))]
-#[allow(unused_variables)]
-fn trace_loop(root: Address, shared_space: Arc<ImmixSpace>, lo_space: Arc<RwLock<FreeListSpace>>) {
-    unimplemented!()
 }

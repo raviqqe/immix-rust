@@ -2,7 +2,7 @@
 name = "immix_rust"
 version = "0.0.1"
 authors = ["Yi Lin <yi.lin@anu.edu.au>"]
-build = "build.rs"
+# build = "build.rs"
 
 [lib]
 name = "immix_rust"

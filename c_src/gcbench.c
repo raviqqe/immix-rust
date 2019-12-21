@@ -56,160 +56,155 @@
 
 /* Get the current time in milliseconds */
 
-unsigned
-stats_rtclock( void )
-{
+unsigned stats_rtclock(void) {
   struct timeval t;
   struct timezone tz;
 
-  if (gettimeofday( &t, &tz ) == -1)
+  if (gettimeofday(&t, &tz) == -1)
     return 0;
   return (t.tv_sec * 1000 + t.tv_usec / 1000);
 }
 
-static const int kStretchTreeDepth    = 18;      // about 16Mb
-static const int kLongLivedTreeDepth  = 16;  // about 4Mb
-static const int kArraySize  = 500000;  // about 4Mb
+static const int kStretchTreeDepth = 18;   // about 16Mb
+static const int kLongLivedTreeDepth = 16; // about 4Mb
+static const int kArraySize = 500000;      // about 4Mb
 static const int kMinTreeDepth = 4;
 static const int kMaxTreeDepth = 16;
 
 typedef struct Node0_struct {
-    uint64_t invisible_hdr;
-    struct Node0_struct * left;
-    struct Node0_struct * right;
-    int i, j;
+  uint64_t invisible_hdr;
+  struct Node0_struct *left;
+  struct Node0_struct *right;
+  int i, j;
 } Node0;
 
-void init_Node(Node0* me, Node0* l, Node0* r) {
-    me -> left = l;
-    me -> right = r;
+void init_Node(Node0 *me, Node0 *l, Node0 *r) {
+  me->left = l;
+  me->right = r;
 }
 
 // Nodes used by a tree of a given size
-static int TreeSize(int i) {
-    return ((1 << (i + 1)) - 1);
-}
+static int TreeSize(int i) { return ((1 << (i + 1)) - 1); }
 
 // Number of iterations to use for a given tree depth
 static int NumIters(int i) {
-    return 2 * TreeSize(kStretchTreeDepth) / TreeSize(i);
+  return 2 * TreeSize(kStretchTreeDepth) / TreeSize(i);
 }
 
 // Build tree top down, assigning to older objects.
-static void Populate(int iDepth, Node0* thisNode, ImmixMutatorLocal* mutator) {
-    if (iDepth<=0) {
-        return;
-    } else {
-        iDepth--;
-        thisNode->left = (Node0*) ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
-        thisNode->right = (Node0*) ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
-        Populate (iDepth, thisNode->left, mutator);
-        Populate (iDepth, thisNode->right, mutator);
-    }
+static void Populate(int iDepth, Node0 *thisNode, ImmixMutatorLocal *mutator) {
+  if (iDepth <= 0) {
+    return;
+  } else {
+    iDepth--;
+    thisNode->left =
+        (Node0 *)ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
+    thisNode->right =
+        (Node0 *)ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
+    Populate(iDepth, thisNode->left, mutator);
+    Populate(iDepth, thisNode->right, mutator);
+  }
 }
 
 // Build tree bottom-up
-static Node0* MakeTree(int iDepth, ImmixMutatorLocal* mutator) {
-    Node0* result;
-    if (iDepth<=0) {
-        result = (Node0*) ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
-        /* result is implicitly initialized in both cases. */
-        return result;
-    } else {
-        Node0* left = MakeTree(iDepth-1, mutator);
-        Node0* right = MakeTree(iDepth-1, mutator);
-        result = (Node0*) ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
-        init_Node(result, left, right);
-        return result;
-    }
+static Node0 *MakeTree(int iDepth, ImmixMutatorLocal *mutator) {
+  Node0 *result;
+  if (iDepth <= 0) {
+    result = (Node0 *)ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
+    /* result is implicitly initialized in both cases. */
+    return result;
+  } else {
+    Node0 *left = MakeTree(iDepth - 1, mutator);
+    Node0 *right = MakeTree(iDepth - 1, mutator);
+    result = (Node0 *)ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
+    init_Node(result, left, right);
+    return result;
+  }
 }
 
-static void PrintDiagnostics() {
+static void PrintDiagnostics() {}
 
-}
+static void TimeConstruction(int depth, ImmixMutatorLocal *mutator) {
+  long tStart, tFinish;
+  int iNumIters = NumIters(depth);
+  Node0 *tempTree;
+  int i;
 
-static void TimeConstruction(int depth, ImmixMutatorLocal* mutator) {
-    long    tStart, tFinish;
-    int     iNumIters = NumIters(depth);
-    Node0*  tempTree;
-    int     i;
+  printf("Creating %d trees of depth %d\n", iNumIters, depth);
 
-    printf("Creating %d trees of depth %d\n", iNumIters, depth);
+  tStart = currentTime();
+  for (i = 0; i < iNumIters; ++i) {
+    tempTree = (Node0 *)ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
+    Populate(depth, tempTree, mutator);
+    tempTree = 0;
+  }
+  tFinish = currentTime();
+  printf("\tTop down construction took %ld msec\n",
+         elapsedTime(tFinish - tStart));
 
-    tStart = currentTime();
-    for (i = 0; i < iNumIters; ++i) {
-        tempTree = (Node0*) ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
-        Populate(depth, tempTree, mutator);
-        tempTree = 0;
-    }
-    tFinish = currentTime();
-    printf("\tTop down construction took %ld msec\n",
-           elapsedTime(tFinish - tStart));
-
-    tStart = currentTime();
-    for (i = 0; i < iNumIters; ++i) {
-            tempTree = MakeTree(depth, mutator);
-            tempTree = 0;
-    }
-    tFinish = currentTime();
-    printf("\tBottom up construction took %ld msec\n",
-           elapsedTime(tFinish - tStart));
-
+  tStart = currentTime();
+  for (i = 0; i < iNumIters; ++i) {
+    tempTree = MakeTree(depth, mutator);
+    tempTree = 0;
+  }
+  tFinish = currentTime();
+  printf("\tBottom up construction took %ld msec\n",
+         elapsedTime(tFinish - tStart));
 }
 
 void bench_start() {
-    Node0*  root;
-    Node0*  longLivedTree;
-    Node0*  tempTree;
-    long    tStart, tFinish;
-    long    tElapsed;
-    int     i, d;
-    double  *array;
+  Node0 *root;
+  Node0 *longLivedTree;
+  Node0 *tempTree;
+  long tStart, tFinish;
+  long tElapsed;
+  int i, d;
+  double *array;
 
-    gc_init();
+  gc_init();
 
-    ImmixMutatorLocal* mutator = ImmixMutatorLocal_new(immix_space);
+  ImmixMutatorLocal *mutator = ImmixMutatorLocal_new(immix_space);
 
-    printf("Garbage Collector Test\n");
-    printf(" Live storage will peak at %ld bytes.\n\n",
-           2 * sizeof(Node0) * TreeSize(kLongLivedTreeDepth) +
-           sizeof(double) * kArraySize);
-    printf(" Stretching memory with a binary tree of depth %d\n",
-           kStretchTreeDepth);
-    PrintDiagnostics();
+  printf("Garbage Collector Test\n");
+  printf(" Live storage will peak at %ld bytes.\n\n",
+         2 * sizeof(Node0) * TreeSize(kLongLivedTreeDepth) +
+             sizeof(double) * kArraySize);
+  printf(" Stretching memory with a binary tree of depth %d\n",
+         kStretchTreeDepth);
+  PrintDiagnostics();
 
-    tStart = currentTime();
+  tStart = currentTime();
 
-    // Stretch the memory space quickly
-    tempTree = MakeTree(kStretchTreeDepth, mutator);
-    tempTree = 0;
+  // Stretch the memory space quickly
+  tempTree = MakeTree(kStretchTreeDepth, mutator);
+  tempTree = 0;
 
-    // Create a long lived object
-    printf(" Creating a long-lived binary tree of depth %d\n",
-           kLongLivedTreeDepth);
-    longLivedTree = (Node0*) ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
-    Populate(kLongLivedTreeDepth, longLivedTree, mutator);
+  // Create a long lived object
+  printf(" Creating a long-lived binary tree of depth %d\n",
+         kLongLivedTreeDepth);
+  longLivedTree = (Node0 *)ImmixMutatorLocal_alloc(mutator, sizeof(Node0), 8);
+  Populate(kLongLivedTreeDepth, longLivedTree, mutator);
 
-    // Create long-lived array, filling half of it
-    printf(" Creating a long-lived array of %d doubles\n", kArraySize);
-    array = malloc(kArraySize * sizeof(double));
-    for (i = 0; i < kArraySize/2; ++i) {
-        array[i] = 1.0/i;
-    }
-    PrintDiagnostics();
+  // Create long-lived array, filling half of it
+  printf(" Creating a long-lived array of %d doubles\n", kArraySize);
+  array = malloc(kArraySize * sizeof(double));
+  for (i = 0; i < kArraySize / 2; ++i) {
+    array[i] = 1.0 / i;
+  }
+  PrintDiagnostics();
 
-    for (d = kMinTreeDepth; d <= kMaxTreeDepth; d += 2) {
-        TimeConstruction(d, mutator);
-    }
+  for (d = kMinTreeDepth; d <= kMaxTreeDepth; d += 2) {
+    TimeConstruction(d, mutator);
+  }
 
-    if (longLivedTree == 0 || array[1000] != 1.0/1000)
-        fprintf(stderr, "Failed\n");
-    // fake reference to LongLivedTree
-    // and array
-    // to keep them from being optimized away
+  if (longLivedTree == 0 || array[1000] != 1.0 / 1000)
+    fprintf(stderr, "Failed\n");
+  // fake reference to LongLivedTree
+  // and array
+  // to keep them from being optimized away
 
-    tFinish = currentTime();
-    tElapsed = elapsedTime(tFinish-tStart);
-    PrintDiagnostics();
-    printf("Completed in %ld msec\n", tElapsed);
+  tFinish = currentTime();
+  tElapsed = elapsedTime(tFinish - tStart);
+  PrintDiagnostics();
+  printf("Completed in %ld msec\n", tElapsed);
 }
